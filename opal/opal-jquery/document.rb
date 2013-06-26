@@ -1,6 +1,6 @@
 require 'opal-jquery/element'
 
-$document = Element.find($global.document)
+$document = Element.find(`window.document`)
 
 class << $document
   # Use Element.ready? instead
