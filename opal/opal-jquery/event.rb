@@ -1,14 +1,22 @@
+Class.bridge_class 'Event', `$.Event`
+
 # Wraps native jQuery event objects.
-class Event < `$.Event`
+class Event
   def [](name)
     `#{self}[name]`
+  end
+
+  def ctrl_key
+    @ctrlKey
   end
 
   def current_target
     `$(#{self}.currentTarget)`
   end
 
-  alias_native :default_prevented?, :isDefaultPrevented
+  def default_prevented?
+    `#{self}.isDefaultPrevented()`
+  end
 
   # Stops propagation and prevents default action.
   def kill
@@ -45,10 +53,10 @@ class Event < `$.Event`
   end
 
   def type
-    `#{self}.type`
+    @type
   end
 
   def which
-    `#{self}.which`
+    @which
   end
 end

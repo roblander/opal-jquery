@@ -1,7 +1,23 @@
 # Instances of Element are just jquery instances, and wrap 1 or more
 # native dom elements.
-class Element < `jQuery`
+
+%x{
+  var root = __opal.global, dom_class;
+
+  if (root.jQuery) { dom_class = jQuery }
+  else if (root.Zepto) { dom_class = Zepto.zepto.Z; }
+}
+
+Class.bridge_class 'Element', `dom_class`
+
+class Element
+  include Enumerable
+
   def self.find(selector)
+    `$(#{selector})`
+  end
+
+  def self.[](selector)
     `$(#{selector})`
   end
 
@@ -25,6 +41,10 @@ class Element < `jQuery`
     `$(str)`
   end
 
+  def self.ready?(&block)
+    `$(#{ block })` if block
+  end
+
   def self.expose(*methods)
     %x{
       for (var i = 0, length = methods.length, method; i < length; i++) {
@@ -36,10 +56,22 @@ class Element < `jQuery`
     }
   end
 
+  attr_reader :selector
+
+  # Bridged functions - we just expose all core jquery functions as ruby
+  # methods on this class.
   expose :after, :before, :parent, :parents, :prepend, :prev, :remove
   expose :hide, :show, :toggle, :children, :blur, :closest, :data
   expose :focus, :find, :next, :siblings, :text, :trigger, :append
+  expose :height, :width, :serialize, :is, :filter, :last, :first
+  expose :wrap, :stop, :clone
 
+  # We alias some jquery methods to common ruby method names.
+  alias succ next
+  alias << append
+
+  # Here we map the remaining jquery methods, but change their names to
+  # snake_case to be more consistent with ruby.
   alias_native :[]=, :attr
   alias_native :add_class, :addClass
   alias_native :append_to, :appendTo
@@ -50,6 +82,13 @@ class Element < `jQuery`
   alias_native :text=, :text
   alias_native :toggle_class, :toggleClass
   alias_native :value=, :val
+  alias_native :scroll_left=, :scrollLeft
+  alias_native :scroll_left, :scrollLeft
+  alias_native :remove_attribute, :removeAttr
+  alias_native :slide_down, :slideDown
+  alias_native :slide_up, :slideUp
+  alias_native :slide_toggle, :slideToggle
+  alias_native :fade_toggle, :fadeToggle
 
   # Missing methods are assumed to be jquery plugins. These are called by
   # the given symbol name.
@@ -59,7 +98,7 @@ class Element < `jQuery`
         return #{self}[#{symbol}].apply(#{self}, args);
       }
     }
-    
+
     super
   end
 
@@ -67,8 +106,14 @@ class Element < `jQuery`
     `#{self}.attr(name) || ""`
   end
 
-  alias << append
-  
+  def add_attribute name
+    self[name] = ''
+  end
+
+  def has_attribute? name
+    `!!#{self}.attr(name)`
+  end
+
   def append_to_body
     `#{self}.appendTo(document.body)`
   end
@@ -162,13 +207,13 @@ class Element < `jQuery`
   # @return [String, DOM] returns css value or the receiver
   def css(name, value=nil)
     if value.nil? && name.is_a?(String)
-      return `$(#{self}).css(name)`
+      return `#{self}.css(name)`
     else
-      name.is_a?(Hash) ? `$(#{self}).css(#{name.to_native})` : `$(#{self}).css(name, value)`
+      name.is_a?(Hash) ? `#{self}.css(#{name.to_n})` : `#{self}.css(name, value)`
     end
     self
   end
-  
+
   # Set css values over time to create animations. The first parameter is a
   # set of css properties and values to animate to. The first parameter
   # also accepts a special :speed value to set animation speed. If a block
@@ -181,16 +226,34 @@ class Element < `jQuery`
   #   bar.animate :top => "30px", :speed => 100 do
   #     bar.add_class "finished"
   #   end
-  # 
+  #
   # @param [Hash] css properties and and values. Also accepts speed param.
   # @return [DOM] receiver
   def animate(params, &block)
     speed = params.has_key?(:speed) ? params.delete(:speed) : 400
     %x{
-      $(#{self}).animate(#{params.to_native}, #{speed}, function() {
+      #{self}.animate(#{params.to_n}, #{speed}, function() {
         #{block.call if block_given?}
       })
-    } 
+    }
+  end
+
+  # Start a visual effect (e.g. fadeIn, fadeOut, …) passing its name.
+  # Underscored style is automatically converted (e.g. `effect(:fade_in)`).
+  # Also accepts additional arguments and a block for the finished callback.
+  def effect(name, *args, &block)
+    name = name.gsub(/_\w/) { |match| match[1].upcase }
+    args = args.map { |a| a.to_n if a.respond_to? :to_n }.compact
+    args << `function() { #{block.call if block_given?} }`
+    `#{self}[#{name}].apply(#{self}, #{args})`
+  end
+
+  def visible?
+    `#{self}.is(':visible')`
+  end
+
+  def offset
+    Hash.from_native(`#{self}.offset()`)
   end
 
   # Yields each element in #{self} collection in turn. The yielded element
@@ -208,11 +271,11 @@ class Element < `jQuery`
     self
   end
 
-  # return an opal array mapped with block yielded for any element 
+  # return an opal array mapped with block yielded for any element
   #
   # @example
   #
-  #  list = Document.find('table.players td.surname').map  {|el| el.html } 
+  #  list = Document.find('table.players td.surname').map  {|el| el.html }
   #
   # @return an Array
   def map
@@ -259,6 +322,10 @@ class Element < `jQuery`
     }
   end
 
+  def tag_name
+    `#{self}.length > 0 ? #{self}[0].tagName.toLowerCase() : #{nil}`
+  end
+
   def inspect
     %x{
       var val, el, str, result = [];
@@ -281,18 +348,26 @@ class Element < `jQuery`
     `#{self}.length`
   end
 
+  def any?
+    `#{self}.length > 0`
+  end
+
+  def empty?
+    `#{self}.length === 0`
+  end
+
+  alias empty? none?
+
   def on(name, sel = nil, &block)
-    `sel === nil ? #{self}.on(name, block) : #{self}.on(name, sel, block)`
+    `sel == nil ? #{self}.on(name, block) : #{self}.on(name, sel, block)`
     block
   end
 
-  def off(name, sel = nil, &block)
-    `sel === nil ? #{self}.off(name, block) : #{self}.off(name, sel, block)`
+  def off(name, sel, block = nil)
+    `block == nil ? #{self}.off(name, sel) : #{self}.off(name, sel, block)`
   end
 
   alias size length
-
-  alias succ next
 
   def value
     `#{self}.val() || ""`

@@ -1,12 +1,7 @@
-require "spec_helper"
+require 'spec_helper'
 
-describe Document do
-  describe '.title and .title=' do
-    it 'sets/gets the page title' do
-      current = Document.title
-      Document.title = 'hello from opal'
-      Document.title.should == 'hello from opal'
-      Document.title = current
-    end
+describe "Document.ready?" do
+  it "accepts a block" do
+    $document.ready? { }
   end
 end
