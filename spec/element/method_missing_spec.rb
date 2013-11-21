@@ -11,8 +11,12 @@ require "spec_helper"
   };
 }
 
-describe "Element#method_missing" do
-  it "calls jquery plugins by given name" do
+class Element
+  expose :opal_specs_extension, :opal_specs_args
+end
+
+describe "Element#exposes" do
+  it "exposes jquery plugins by given name" do
     Element.new.opal_specs_extension.should eq("foo_bar_baz")
   end
 
@@ -21,8 +25,8 @@ describe "Element#method_missing" do
   end
 
   it "only forwards calls when a native method exists" do
-    lambda {
+    expect {
       Element.new.some_unknown_plugin
-    }.should raise_error(NoMethodError)
+    }.to raise_error(Exception)
   end
 end

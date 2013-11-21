@@ -1,13 +1,20 @@
 require 'opal-jquery/element'
 
-$document = Element.find(`window.document`)
+Document = Element.find(`document`)
 
-class << $document
-  # Use Element.ready? instead
+class << Document
   def ready?(&block)
-    ::Element.ready?(&block)
+    `$(#{ block })` if block
+  end
+
+  def title
+    `document.title`
+  end
+
+  def title=(title)
+    `document.title = #{title}`
   end
 end
 
 # TODO: this will be removed soon (here for compatibility)
-Document = $document
+$document = Document

@@ -1,9 +1,6 @@
-# Wraps jQuery's ajax request into a ruby class.
-#
-#     HTTP.get("/users/1.json") do |response|
-#       puts "Got response!"
-#     end
-#
+require 'json'
+require 'native'
+
 class HTTP
   attr_reader :body, :error_message, :method, :status_code, :url, :xhr
 
@@ -40,7 +37,7 @@ class HTTP
       if (typeof(payload) === 'string') {
         settings.data = payload;
       }
-      else if ((payload != null) && (payload != Opal.nil)) {
+      else if (payload != nil) {
         settings.data = payload.$to_json();
         settings.contentType = 'application/json';
       }
